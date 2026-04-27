@@ -48,6 +48,12 @@ on:
       GH_TOOLS_PAT:
         description: "GitHub PAT with read access to rrmadmin/rrm-tools + rrmadmin/ecosystem-identity"
         required: true
+      MCRN_PHIL_BOYLE:
+        description: "Phil Boyle's MCRN. Public per imc.ie; held as a secret to honour the registry's pii_class:restricted convention without committing the literal."
+        required: false
+      MCRN_AGNES_TOTH:
+        description: "Agnes Toth's MCRN. Public per imc.ie; held as a secret for the same reason."
+        required: false
 
 jobs:
   deploy:
@@ -86,6 +92,56 @@ jobs:
           ls "$GITHUB_WORKSPACE/../../tools/site-ssot/bin/" >/dev/null
           ls "$HOME/iCode/config/ecosystem-identity/" >/dev/null
           echo "OK: ecosystem layout staged"
+
+      # site-ssot's op-inject.mjs spawns the 1Password CLI to resolve any
+      # _value_source: "op://..." entries in the registry. CI runners don't
+      # have op + the 1P service-account token (and uploading the master
+      # token would massively expand its blast radius). Instead, accept
+      # narrow per-identifier secrets at the caller and substitute them
+      # into the registry files in-place before site-ssot runs.
+      #
+      # Currently 2 identifiers use _value_source:
+      #   - people[phil-boyle].MCRN  → MCRN_PHIL_BOYLE secret
+      #   - people[agnes-toth].MCRN  → MCRN_AGNES_TOTH secret
+      #
+      # Add new pairs here as they appear in the registry. If the secret
+      # is unset, the entry is left as-is and the build will fail with the
+      # original op-spawn error — that's intentional, surfaces the gap.
+      - name: Resolve op-sourced identifiers via narrow secrets
+        env:
+          REG_DIR: ${{ github.workspace }}/_ecosystem/identity-src
+          MCRN_PHIL_BOYLE: ${{ secrets.MCRN_PHIL_BOYLE }}
+          MCRN_AGNES_TOTH: ${{ secrets.MCRN_AGNES_TOTH }}
+        run: |
+          set -euo pipefail
+          node -e "
+            const fs = require('fs');
+            const path = require('path');
+            const file = path.join(process.env.REG_DIR, 'people.json');
+            const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+            const map = {
+              'op://Automation/Identifiers-PhilBoyle/MCRN': process.env.MCRN_PHIL_BOYLE,
+              'op://Automation/Identifiers-AgnesToth/MCRN': process.env.MCRN_AGNES_TOTH,
+            };
+            let resolved = 0, skipped = 0;
+            for (const person of (data.people || [])) {
+              for (const ident of (person.identifiers || [])) {
+                if (typeof ident._value_source !== 'string') continue;
+                const v = map[ident._value_source];
+                if (v && v.length > 0) {
+                  ident.value = v;
+                  delete ident._value_source;
+                  resolved++;
+                } else {
+                  skipped++;
+                  console.error('UNRESOLVED:', ident._value_source);
+                }
+              }
+            }
+            fs.writeFileSync(file, JSON.stringify(data, null, 2) + '\n');
+            console.log('resolved=' + resolved + ' skipped=' + skipped);
+            if (skipped > 0) process.exit(1);
+          "
 
       - name: Setup Node
         uses: actions/setup-node@v4
