@@ -86,12 +86,20 @@ jobs:
           # ssot-prebuild.mjs hardcodes:
           #   TOOL_ROOT = resolve(PROJECT_ROOT, '../../tools/site-ssot')
           # Mirror both layouts symbolically.
+          # 1. Tools at ../../tools relative to project (matches local ~/iCode/tools)
           ln -snf "$GITHUB_WORKSPACE/_ecosystem/tools-src" "$GITHUB_WORKSPACE/../../tools"
+          # 2. Tools also at $HOME/iCode/tools (some scripts reference ~/iCode/tools/... directly,
+          #    e.g. package.json postbuild "standards": "node ~/iCode/tools/standards-gate/run.mjs")
+          mkdir -p "$HOME/iCode"
+          ln -snf "$GITHUB_WORKSPACE/_ecosystem/tools-src" "$HOME/iCode/tools"
+          # 3. Registry at $HOME/iCode/config/ecosystem-identity (Node's homedir() based path)
           mkdir -p "$HOME/iCode/config"
           ln -snf "$GITHUB_WORKSPACE/_ecosystem/identity-src" "$HOME/iCode/config/ecosystem-identity"
+          # Verify each path
           ls "$GITHUB_WORKSPACE/../../tools/site-ssot/bin/" >/dev/null
+          ls "$HOME/iCode/tools/standards-gate/" >/dev/null
           ls "$HOME/iCode/config/ecosystem-identity/" >/dev/null
-          echo "OK: ecosystem layout staged"
+          echo "OK: ecosystem layout staged (../../tools + ~/iCode/tools + ~/iCode/config/ecosystem-identity)"
 
       # site-ssot's op-inject.mjs spawns the 1Password CLI to resolve any
       # _value_source: "op://..." entries in the registry. CI runners don't
@@ -154,6 +162,10 @@ jobs:
 
       - name: Install dependencies (site-ssot)
         working-directory: _ecosystem/tools-src/site-ssot
+        run: npm ci || npm install
+
+      - name: Install dependencies (standards-gate)
+        working-directory: _ecosystem/tools-src/standards-gate
         run: npm ci || npm install
 
       - name: Build
