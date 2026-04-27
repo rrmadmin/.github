@@ -1,0 +1,12 @@
+name: Minimal reusable test
+on:
+  workflow_call:
+    inputs:
+      msg:
+        type: string
+        required: true
+jobs:
+  hello:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "hello from reusable - msg=${{ inputs.msg }}"
