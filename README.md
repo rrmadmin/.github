@@ -58,16 +58,18 @@ That's it. ~10 lines of YAML per site instead of ~80.
 | `build-staging-block` | no | `"1"` | `ASTRO_STAGING_BLOCK` env passed to build (1 = staging robots/headers, 0 = production). |
 | `node-version` | no | `"22"` | Node version for the runner. |
 
-### Org-level secrets / vars (set once at the rrmadmin org level → all consumer repos inherit)
+### Per-repo secrets / vars (set once per consumer site)
+
+`rrmadmin` is a User account, so org-level secret inheritance is not available. Each consumer site sets these at the repo level:
 
 **Secrets:**
-- `CLOUDFLARE_API_TOKEN` — CF API token with **Pages: Edit** + **Workers Pages: Read & Write** scope on the ecosystem account(s).
-- `GH_TOOLS_PAT` — GitHub PAT with read access to `rrmadmin/rrm-tools` and `rrmadmin/ecosystem-identity` (the two repos this workflow checks out at runtime).
+- `CLOUDFLARE_API_TOKEN` — CF API token with **Pages: Edit** scope on the ecosystem account(s).
+- `GH_TOOLS_PAT` — GitHub PAT with read access to `rrmadmin/rrm-tools` and `rrmadmin/ecosystem-identity` (the two repos this workflow checks out at runtime). Same PAT can be reused across all consumer sites.
 
 **Vars:**
 - `CLOUDFLARE_ACCOUNT_ID` — the CF account that owns the consumer's Pages project.
 
-If a consumer site lives on a different CF account, set the var at the **repo** level instead — repo-level overrides org-level.
+Onboarding a new site: ~30 seconds of `gh secret set` / `gh variable set` per consumer.
 
 ### What the workflow does
 
