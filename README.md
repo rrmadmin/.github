@@ -40,10 +40,13 @@ on:
 
 jobs:
   deploy:
-    uses: rrmadmin/.github/workflows/astro-cf-deploy.yml@main
+    uses: rrmadmin/.github/.github/workflows/astro-cf-deploy.yml@main
     with:
-      project-name: my-project-name  # CF Pages project name
-    secrets: inherit
+      project-name: my-project-name           # CF Pages project name (slug)
+      cloudflare-account-id: 88e9cb57...      # CF account ID that owns the Pages project
+    secrets:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      GH_TOOLS_PAT: ${{ secrets.GH_TOOLS_PAT }}
 ```
 
 That's it. ~10 lines of YAML per site instead of ~80.

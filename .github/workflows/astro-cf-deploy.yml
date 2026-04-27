@@ -35,6 +35,10 @@ on:
         description: "CF Pages project name (e.g., neofertility-ie)"
         required: true
         type: string
+      cloudflare-account-id:
+        description: "CF account ID that owns the Pages project"
+        required: true
+        type: string
       branch:
         description: "Branch to deploy under (production = main on most projects)"
         required: false
@@ -55,6 +59,13 @@ on:
         required: false
         type: string
         default: "22"
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        description: "CF API token with Pages: Edit"
+        required: true
+      GH_TOOLS_PAT:
+        description: "GitHub PAT with read access to rrmadmin/rrm-tools + rrmadmin/ecosystem-identity"
+        required: true
 
 jobs:
   deploy:
@@ -142,5 +153,5 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          accountId: ${{ inputs.cloudflare-account-id }}
           command: pages deploy dist/ --project-name=${{ inputs.project-name }} --branch=${{ inputs.branch }} --commit-dirty=true --commit-hash=${{ github.sha }}
