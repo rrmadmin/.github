@@ -71,12 +71,6 @@ jobs:
   deploy:
     name: Build + deploy
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      deployments: write
-    concurrency:
-      group: astro-cf-deploy-${{ inputs.project-name }}-${{ inputs.branch }}
-      cancel-in-progress: false
 
     steps:
       - name: Checkout caller repo
