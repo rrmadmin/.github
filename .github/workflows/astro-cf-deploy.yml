@@ -7,26 +7,13 @@ name: Astro + CF Pages reusable deploy
 # converted to "Direct Upload" mode (a one-way conversion that happens
 # whenever wrangler pages deploy is run, per CF docs / API error 8000069).
 #
-# Each consumer site has a 10-line workflow at .github/workflows/deploy.yml:
+# Each consumer site has a ~15-line workflow at .github/workflows/deploy.yml
+# that delegates to this one. See README at https://github.com/rrmadmin/.github
+# for the canonical caller template + secret setup.
 #
-#   on:
-#     push: { branches: [main] }
-#     workflow_dispatch:
-#   jobs:
-#     deploy:
-#       uses: rrmadmin/.github/workflows/astro-cf-deploy.yml@main
-#       with:
-#         project-name: my-project-name
-#       secrets: inherit
-#
-# Org-level secrets required (set once at rrmadmin GitHub org, inherited by all consumers):
-#   - CLOUDFLARE_API_TOKEN  — CF API token with Pages: Edit
-#   - GH_TOOLS_PAT          — PAT with read access to rrmadmin/rrm-tools + rrmadmin/ecosystem-identity
-#
-# Org-level vars required:
-#   - CLOUDFLARE_ACCOUNT_ID — the CF account that owns the Pages project
-#
-# (Vars + secrets at the rrmadmin org level → all member repos inherit; no per-site setup.)
+# Assumes the consumer Astro site uses our shared `site-ssot` build pipeline
+# (rrmadmin/rrm-tools) + the canonical `ecosystem-identity` registry. Sites
+# that don't use site-ssot need a different workflow.
 
 on:
   workflow_call:
@@ -44,11 +31,6 @@ on:
         required: false
         type: string
         default: main
-      ssot-enabled:
-        description: "Whether to run the site-ssot prebuild (default true; sites without site-ssot integration set false)"
-        required: false
-        type: boolean
-        default: true
       build-staging-block:
         description: "ASTRO_STAGING_BLOCK env value passed to npm run build (1=staging robots/headers, 0=production)"
         required: false
@@ -76,11 +58,7 @@ jobs:
       - name: Checkout caller repo
         uses: actions/checkout@v4
 
-      # rrm-tools holds site-ssot, standards-gate, and other shared build tools.
-      # Mirror the local layout (~/iCode/tools/...) so scripts that resolve paths
-      # via `resolve(projectRoot, '../../tools/...')` Just Work in CI.
       - name: Checkout rrm-tools
-        if: ${{ inputs.ssot-enabled }}
         uses: actions/checkout@v4
         with:
           repository: rrmadmin/rrm-tools
@@ -88,7 +66,6 @@ jobs:
           path: _ecosystem/tools-src
 
       - name: Checkout ecosystem-identity registry
-        if: ${{ inputs.ssot-enabled }}
         uses: actions/checkout@v4
         with:
           repository: rrmadmin/ecosystem-identity
@@ -96,7 +73,6 @@ jobs:
           path: _ecosystem/identity-src
 
       - name: Stage ecosystem layout (mirror local ~/iCode/...)
-        if: ${{ inputs.ssot-enabled }}
         run: |
           set -euo pipefail
           # site-ssot's lib/paths.mjs hardcodes:
@@ -104,26 +80,14 @@ jobs:
           # ssot-prebuild.mjs hardcodes:
           #   TOOL_ROOT = resolve(PROJECT_ROOT, '../../tools/site-ssot')
           # Mirror both layouts symbolically.
-
-          # 1. Tools at ../../tools (one level above $GITHUB_WORKSPACE's parent)
           ln -snf "$GITHUB_WORKSPACE/_ecosystem/tools-src" "$GITHUB_WORKSPACE/../../tools"
-
-          # 2. Registry under $HOME (Node's homedir())
           mkdir -p "$HOME/iCode/config"
           ln -snf "$GITHUB_WORKSPACE/_ecosystem/identity-src" "$HOME/iCode/config/ecosystem-identity"
-
-          # Verify resolution
-          node -e "
-            const path = require('path');
-            const os = require('os');
-            console.log('TOOL_ROOT  =', path.resolve(process.cwd(), '../../tools/site-ssot'));
-            console.log('REGISTRY   =', path.resolve(os.homedir(), 'iCode/config/ecosystem-identity'));
-          "
           ls "$GITHUB_WORKSPACE/../../tools/site-ssot/bin/" >/dev/null
           ls "$HOME/iCode/config/ecosystem-identity/" >/dev/null
           echo "OK: ecosystem layout staged"
 
-      - name: Setup Node ${{ inputs.node-version }}
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
@@ -133,14 +97,13 @@ jobs:
         run: npm ci
 
       - name: Install dependencies (site-ssot)
-        if: ${{ inputs.ssot-enabled }}
         working-directory: _ecosystem/tools-src/site-ssot
         run: npm ci || npm install
 
       - name: Build
         env:
           ASTRO_STAGING_BLOCK: ${{ inputs.build-staging-block }}
-          SITE_SSOT_ENABLED: ${{ inputs.ssot-enabled && '1' || '0' }}
+          SITE_SSOT_ENABLED: "1"
         run: npm run build
 
       - name: Deploy to Cloudflare Pages
