@@ -1,0 +1,37 @@
+name: 'Lint CF Pages _headers'
+description: >
+  Detect duplicate path patterns and within-block duplicate header names in a
+  Cloudflare Pages _headers file. Runs the canonical lint script from
+  rrmadmin/rrm-tools so the logic stays in one place across CI workflows AND
+  manual-deploy rituals. Spec: ~/iCode/docs/standards/cf-pages-headers-pattern.md
+
+inputs:
+  headers-path:
+    description: >
+      Path to the _headers file to lint, relative to GITHUB_WORKSPACE.
+      Default is dist/_headers (the built artifact CF Pages actually receives,
+      which works for both Astro projects with prebuild templating and projects
+      that commit _headers directly).
+    required: false
+    default: 'dist/_headers'
+  tools-token:
+    description: 'PAT with read access to rrmadmin/rrm-tools'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout rrm-tools (lint script source)
+      uses: actions/checkout@v4
+      with:
+        repository: rrmadmin/rrm-tools
+        token: ${{ inputs.tools-token }}
+        path: _ecosystem/lint-cf-headers-tools
+        sparse-checkout: lint-cf-headers
+        sparse-checkout-cone-mode: false
+
+    - name: Run lint
+      shell: bash
+      run: |
+        bash "$GITHUB_WORKSPACE/_ecosystem/lint-cf-headers-tools/lint-cf-headers/lint.sh" \
+          "$GITHUB_WORKSPACE/${{ inputs.headers-path }}"
