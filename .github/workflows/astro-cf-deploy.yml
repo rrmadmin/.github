@@ -14,6 +14,15 @@ name: Astro + CF Pages reusable deploy
 # Assumes the consumer Astro site uses our shared `site-ssot` build pipeline
 # (rrmadmin/rrm-tools) + the canonical `ecosystem-identity` registry. Sites
 # that don't use site-ssot need a different workflow.
+#
+# CROSS-REPO AUTH (2026-05-21): cross-repo checkouts use a GitHub App token
+# minted per-run via actions/create-github-app-token, replacing the previous
+# GH_TOOLS_PAT pattern that required manual rotation. App = "RRM Admin
+# Automation" (App 3795771, install 134350585), installed on @rrmadmin with
+# All-repositories scope. App ID + private key are org-level secrets
+# (RRM_ADMIN_APP_ID, RRM_ADMIN_APP_PRIVATE_KEY) inherited via
+# `secrets: inherit` in caller workflows. Bot identity:
+# rrm-admin-automation[bot]. See memory: github-app-rrm-admin-automation.md.
 
 on:
   workflow_call:
@@ -45,8 +54,11 @@ on:
       CLOUDFLARE_API_TOKEN:
         description: "CF API token with Pages: Edit"
         required: true
-      GH_TOOLS_PAT:
-        description: "GitHub PAT with read access to rrmadmin/rrm-tools + rrmadmin/ecosystem-identity"
+      RRM_ADMIN_APP_ID:
+        description: "GitHub App ID for RRM Admin Automation (org-level secret)"
+        required: true
+      RRM_ADMIN_APP_PRIVATE_KEY:
+        description: "PEM-format private key for RRM Admin Automation App (org-level secret)"
         required: true
       MCRN_PHIL_BOYLE:
         description: "Phil Boyle's MCRN. Public per imc.ie; held as a secret to honour the registry's pii_class:restricted convention without committing the literal."
@@ -61,6 +73,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Mint cross-repo App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RRM_ADMIN_APP_ID }}
+          private-key: ${{ secrets.RRM_ADMIN_APP_PRIVATE_KEY }}
+          owner: rrmadmin
+          repositories: |
+            rrm-tools
+            ecosystem-identity
+
       - name: Checkout caller repo
         uses: actions/checkout@v4
 
@@ -68,14 +91,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: rrmadmin/rrm-tools
-          token: ${{ secrets.GH_TOOLS_PAT }}
+          token: ${{ steps.app-token.outputs.token }}
           path: _ecosystem/tools-src
 
       - name: Checkout ecosystem-identity registry
         uses: actions/checkout@v4
         with:
           repository: rrmadmin/ecosystem-identity
-          token: ${{ secrets.GH_TOOLS_PAT }}
+          token: ${{ steps.app-token.outputs.token }}
           path: _ecosystem/identity-src
 
       - name: Stage ecosystem layout (mirror local ~/iCode/...)
@@ -178,7 +201,7 @@ jobs:
         uses: rrmadmin/.github/.github/actions/lint-cf-headers@main
         with:
           headers-path: dist/_headers
-          tools-token: ${{ secrets.GH_TOOLS_PAT }}
+          tools-token: ${{ steps.app-token.outputs.token }}
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
