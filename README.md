@@ -46,7 +46,8 @@ jobs:
       cloudflare-account-id: 88e9cb57...      # CF account ID that owns the Pages project
     secrets:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      GH_TOOLS_PAT: ${{ secrets.GH_TOOLS_PAT }}
+      RRM_ADMIN_APP_ID: ${{ secrets.RRM_ADMIN_APP_ID }}
+      RRM_ADMIN_APP_PRIVATE_KEY: ${{ secrets.RRM_ADMIN_APP_PRIVATE_KEY }}
 ```
 
 That's it. ~10 lines of YAML per site instead of ~80.
@@ -67,7 +68,7 @@ That's it. ~10 lines of YAML per site instead of ~80.
 
 **Secrets:**
 - `CLOUDFLARE_API_TOKEN` — CF API token with **Pages: Edit** scope on the ecosystem account(s).
-- `GH_TOOLS_PAT` — GitHub PAT with read access to `rrmadmin/rrm-tools` and `rrmadmin/ecosystem-identity` (the two repos this workflow checks out at runtime). Same PAT can be reused across all consumer sites.
+- `RRM_ADMIN_APP_ID` / `RRM_ADMIN_APP_PRIVATE_KEY`: credentials for the **RRM Admin Automation** GitHub App. The workflow mints a short-lived installation token from these (scoped to `rrmadmin/rrm-tools` + `rrmadmin/ecosystem-identity`) for the runtime cross-repo checkouts. Replaced the manually-rotated `GH_TOOLS_PAT` in the 2026-05-21 App migration. The App is installed org-wide, so the same two secrets work on every consumer site (or forward them with `secrets: inherit`).
 
 **Vars:**
 - `CLOUDFLARE_ACCOUNT_ID` — the CF account that owns the consumer's Pages project.
